@@ -1,0 +1,32 @@
+[package]
+name = "webgpu"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+winit = "*"
+env_logger = "*"
+log = "*"
+wgpu = "*"
+wasm-bindgen = "*"
+
+[dependencies.web-sys]
+version = "^0.3.7"
+features = [
+    'Document',
+    'Element',
+    'HtmlElement',
+    'Node',
+    'Window',
+    'Navigator',
+    'Gpu'
+]
+
+[lib]
+crate-type = ["cdylib"]
+
+[build-dependencies]
+fs_extra = "1.3.0"
+
+[build]
+rustflags = ["--cfg=web_sys_unstable_apis"]
