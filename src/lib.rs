@@ -1,14 +1,15 @@
 use std::{env::var, path::PathBuf};
-use wgpu::{Instance, InstanceDescriptor, Backends, InstanceFlags, Dx12Compiler::Dxc, Gles3MinorVersion::Automatic, PowerPreference, RequestAdapterOptions, Adapter, Device, SurfaceTarget, WindowHandle};
+use wgpu::{
+    Adapter, Backends, Device, DeviceDescriptor, Dx12Compiler::Dxc, Gles3MinorVersion::Automatic, Instance, InstanceDescriptor, InstanceFlags, PowerPreference, Queue, RenderPipelineDescriptor, RequestAdapterOptions, SurfaceTarget, WindowHandle
+};
 use wasm_bindgen::{JsCast, prelude::*};
 use web_sys::{Document, Element, Gpu, HtmlCanvasElement, HtmlElement, Navigator, Node, Window};
 use wasm_bindgen_futures::JsFuture;
 
 #[wasm_bindgen(start)]
 pub async fn run() {
-    let window: Window = web_sys::window().expect("no global window");
-    let document: Document = window.document().expect("window should contain document object");
-    let canvas: HtmlCanvasElement = document.query_selector("#gpu-canvas").unwrap_throw().unwrap_throw().dyn_into::<HtmlCanvasElement>().expect("should be castable to HtmlCanvasElement");
+    let window = if let Some(win) = create_window_handle() { win } else { panic!("FATAL: Window must exist for execution to continue") };
+    let canvas = get_canvas_context(&window);
 
 
     let out_dir = var("OUT_DIR").unwrap();
@@ -22,7 +23,33 @@ pub async fn run() {
     let surface_target = SurfaceTarget::Canvas(canvas);
     let surface = instance.create_surface(surface_target).unwrap(); // Handle this better than with unwrap
 
-    let adapter: Adapter = instance.request_adapter(&RequestAdapterOptions { power_preference: PowerPreference::HighPerformance, force_fallback_adapter: false, compatible_surface: Some(&surface) }).await.unwrap_throw();
+    let adapter: Adapter = instance.request_adapter(&RequestAdapterOptions {
+        power_preference: PowerPreference::HighPerformance,
+        force_fallback_adapter: false,
+        compatible_surface: Some(&surface)
+    }).await.unwrap_throw();
 
-    todo!("Grab device from adapter");
+    let  (device, queue) = adapter.request_device(&DeviceDescriptor {
+        required_features: wgpu::Features::all_webgpu_mask(),
+        required_limits: wgpu::Limits::default(),
+        memory_hints: wgpu::MemoryHints::Performance,
+        label: None
+    }, None).await.unwrap_throw();
+}
+
+fn get_canvas_context(window: &Window) -> HtmlCanvasElement {
+    let document = window.document().expect("FATAL: Unable to attain a reference to the document object associated with the global window");
+    let canvas = document.get_element_by_id("gpu-canvas").unwrap_or_else(|| {
+        let element = document.create_element("canvas").expect("FATAL: Error occured while creating a canvas element");
+        element.set_id("gpu-canvas");
+        document.body().expect("FATAL: HTML document is not valid, unable to attain a handle to the body element, or body does not exist")
+                       .append_child(&element)
+                       .expect("FATAL: Unable to append the canvas element to the document, aborting");
+        element
+    }).dyn_into::<HtmlCanvasElement>().expect("Unable to cast the Element into the HtmlCanvasElement");
+    canvas
+}
+
+fn create_window_handle() -> Option<Window> {
+    web_sys::window()
 }
